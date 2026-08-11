@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#ffffff">
+<title>Notes & To-Do</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--text:#171717;--muted:#666;--border:#ddd;--accent:#171717;--danger:#c62828}
+body.dark{--bg:#121212;--card:#1d1d1f;--text:#f5f5f7;--muted:#aaa;--border:#3a3a3c;--accent:#f5f5f7;--danger:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+button,input,select{font:inherit}button{cursor:pointer}.app{max-width:900px;margin:auto;padding:22px 18px 50px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.top h1{font-size:38px;margin:0}.sub{color:var(--muted);margin:7px 0 0}
+.theme,.back,.secondary{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:10px 13px}
+.menu{display:grid;gap:13px;margin-top:34px}.menu button,.primary{border:0;border-radius:14px;background:var(--accent);color:var(--bg);padding:17px;text-align:left;font-weight:600}
+.screen{display:none}.screen.active{display:block}.header{display:flex;align-items:center;gap:12px;margin-bottom:18px}.header h2{margin:0;font-size:28px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.danger{border:1px solid var(--danger);background:transparent;color:var(--danger);border-radius:10px;padding:10px 13px}
+.todo{margin:0;padding-left:28px}.todo li{margin:7px 0}.todo input{width:100%;border:0;outline:0;background:transparent;color:var(--text);padding:7px 3px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px}.toolbar select,.toolbar input{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:8px;padding:8px}.toolbar input[type=color]{width:44px;padding:3px}
+.editor{min-height:55vh;outline:0;line-height:1.55;overflow-wrap:anywhere}.editor:empty:before{content:"Start typing...";color:var(--muted)}.editor img{max-width:100%;height:auto;display:block;border-radius:8px;margin:8px 0}
+.saved{display:grid;gap:10px}.row{display:flex;gap:9px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:11px}.open{flex:1;border:0;background:transparent;color:var(--text);text-align:left}.type{color:var(--muted);font-size:13px;margin-top:3px}.empty{text-align:center;color:var(--muted);padding:25px;border:1px dashed var(--border);border-radius:13px;background:var(--card)}
+.modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;padding:18px}.modal.show{display:flex}.box{width:min(500px,100%);background:var(--card);border-radius:16px;padding:20px}.box input{width:100%;padding:11px;margin:12px 0;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text)}.modalActions{display:flex;justify-content:flex-end;gap:8px}
+@media(max-width:600px){.top h1{font-size:31px}}
+</style>
+</head>
+<body>
+<div class="app">
+<section id="home" class="screen active">
+<div class="top"><div><h1>Notes & To-Do</h1><p class="sub">Your personal workspace</p></div><button id="theme" class="theme">Dark mode</button></div>
+<div class="menu">
+<button onclick="newTodo()">Create To-Do List</button>
+<button onclick="newNote()">Create Notes Page</button>
+<button onclick="showSaved()">Saved Pages</button>
+</div>
+</section>
+
+<section id="todoScreen" class="screen">
+<div class="header"><button class="back" onclick="home()">← Back</button><h2>To-Do List</h2></div>
+<div class="card"><ol id="todo" class="todo"></ol><div class="actions"><button class="primary" onclick="requestSave('todo')">Save</button><button class="danger" onclick="deleteCurrent()">Delete</button></div></div>
+</section>
+
+<section id="noteScreen" class="screen">
+<div class="header"><button class="back" onclick="home()">← Back</button><h2>Notes</h2></div>
+<div class="card">
+<div class="toolbar">
+<select id="size"><option value="14px">14</option><option value="16px" selected>16</option><option value="18px">18</option><option value="22px">22</option><option value="28px">28</option><option value="36px">36</option><option value="48px">48</option></select>
+<input id="color" type="color" value="#171717" title="Font color">
+<button class="secondary" onclick="document.getElementById('image').click()">Insert Image</button>
+<input id="image" type="file" accept="image/*" hidden>
+</div>
+<div id="editor" class="editor" contenteditable="true" spellcheck="true"></div>
+<div class="actions"><button class="primary" onclick="requestSave('note')">Save</button><button class="danger" onclick="deleteCurrent()">Delete</button></div>
+</div>
+</section>
+
+<section id="savedScreen" class="screen">
+<div class="header"><button class="back" onclick="home()">← Back</button><h2>Saved Pages</h2></div>
+<div id="saved" class="saved"></div>
+</section>
+</div>
+
+<div id="modal" class="modal"><div class="box"><h3>Name this page</h3><input id="name" maxlength="80" placeholder="Enter a name"><div class="modalActions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="confirmSave()">Save</button></div></div></div>
+
+<script>
+const KEY="notesTodoPages_v1",THEME="notesTodoTheme_v1";
+let pages=JSON.parse(localStorage.getItem(KEY)||"[]"),currentId=null,pendingType=null;
+const $=id=>document.getElementById(id);
+function store(){localStorage.setItem(KEY,JSON.stringify(pages))}
+function screen(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));$(id).classList.add("active");scrollTo(0,0)}
+function home(){currentId=null;screen("home")}
+function newTodo(){currentId=null;$("todo").innerHTML="";addItem();screen("todoScreen")}
+function addItem(value=""){let li=document.createElement("li"),i=document.createElement("input");i.value=value;i.autocomplete="off";i.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addItem();$("todo").lastElementChild.querySelector("input").focus()}};li.append(i);$("todo").append(li)}
+function newNote(){currentId=null;$("editor").innerHTML="";$("editor").style.fontSize="16px";$("editor").style.color="";$("color").value="#171717";screen("noteScreen");setTimeout(()=>$("editor").focus(),50)}
+function showSaved(){renderSaved();screen("savedScreen")}
+function requestSave(type){pendingType=type;$("name").value=currentId?(pages.find(p=>p.id===currentId)?.name||""):"";$("modal").classList.add("show");setTimeout(()=>$("name").focus(),50)}
+function closeModal(){$("modal").classList.remove("show");pendingType=null}
+function confirmSave(){
+let name=$("name").value.trim()||"Untitled Page",p=currentId?pages.find(x=>x.id===currentId):null;
+if(!p){p={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),type:pendingType,name,updatedAt:Date.now(),content:{}};pages.unshift(p);currentId=p.id}
+p.name=name;p.type=pendingType;p.updatedAt=Date.now();
+if(pendingType==="todo")p.content={items:[...$("todo").querySelectorAll("input")].map(x=>x.value.trim()).filter(Boolean)};
+else p.content={html:$("editor").innerHTML,fontSize:$("editor").style.fontSize||"16px",color:$("color").value};
+store();closeModal();alert("Page saved.");
+}
+function openPage(id){let p=pages.find(x=>x.id===id);if(!p)return;currentId=id;if(p.type==="todo"){$("todo").innerHTML="";(p.content.items.length?p.content.items:[""]).forEach(addItem);screen("todoScreen")}else{$("editor").innerHTML=p.content.html||"";$("editor").style.fontSize=p.content.fontSize||"16px";$("color").value=p.content.color||"#171717";screen("noteScreen")}}
+function deleteCurrent(){if(currentId){if(!confirm("Delete this saved page?"))return;pages=pages.filter(x=>x.id!==currentId);store()}home()}
+function deletePage(id){let p=pages.find(x=>x.id===id);if(!p||!confirm('Delete "'+p.name+'"?'))return;pages=pages.filter(x=>x.id!==id);store();renderSaved()}
+function renderSaved(){let box=$("saved");box.innerHTML="";if(!pages.length){box.innerHTML='<div class="empty">No saved pages yet.</div>';return}pages.forEach(p=>{let row=document.createElement("div"),b=document.createElement("button"),d=document.createElement("button"),t=document.createElement("div"),s=document.createElement("div");row.className="row";b.className="open";d.className="danger";t.textContent=p.name;s.className="type";s.textContent=p.type==="todo"?"To-do list":"Notes page";b.append(t,s);b.onclick=()=>openPage(p.id);d.textContent="Delete";d.onclick=()=>deletePage(p.id);row.append(b,d);box.append(row)})}
+$("size").onchange=e=>$("editor").style.fontSize=e.target.value;
+$("color").oninput=e=>{let sel=getSelection();if(sel.rangeCount&&!sel.isCollapsed&&$("editor").contains(sel.anchorNode))document.execCommand("foreColor",false,e.target.value);else $("editor").style.color=e.target.value};
+$("image").onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{let img=document.createElement("img");img.src=r.result;let s=getSelection();if(s.rangeCount&&$("editor").contains(s.anchorNode)){let q=s.getRangeAt(0);q.collapse(false);q.insertNode(img)}else $("editor").append(img)};r.readAsDataURL(f);e.target.value=""};
+$("theme").onclick=()=>{let dark=document.body.classList.toggle("dark");localStorage.setItem(THEME,dark?"dark":"light");$("theme").textContent=dark?"Light mode":"Dark mode";document.querySelector('meta[name="theme-color"]').content=dark?"#121212":"#ffffff"};
+if(localStorage.getItem(THEME)==="dark"){$("theme").click()}
+</script>
+</body>
+</html>
